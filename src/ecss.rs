@@ -1,11 +1,11 @@
 use crate::{Collection, Component};
 use std::{
-    any::{type_name, Any}, // TODO: Remove once proc macro generates type ids
+    any::{type_name, Any},
     collections::HashMap,
 };
 
 pub type Entity = usize; //TODO Make struct including generational id
-pub type Type = u64; //TODO Make struct including generational id
+pub type Type = usize;
 pub static INVALID_ENTITY: Entity = 0;
 
 #[macro_export]
@@ -26,12 +26,12 @@ pub trait ComponentType {
     fn get_type_id() -> Type;
 }
 
-// Stands for: ECS, Stupid.
+//Stands for ECS, Stupid.
 pub struct ECSS {
     entities: Entity,
     reusable_entities: Vec<Entity>,
     components: Vec<Box<dyn Any>>,
-    type_map: HashMap<Type, usize>, // type_id -> components vec index lookup
+    type_map: HashMap<Type, usize>,
 }
 
 //TODO Should eventually be generic, to allow client to pass in custom allocators now that Vec supports this.
@@ -41,8 +41,7 @@ impl Default for ECSS {
             entities: INVALID_ENTITY,
             reusable_entities: Vec::new(),
             components: Vec::new(),
-            type_map: HashMap::new(), // K: type_id -> V: components vec index lookup
-                                      // type_ids: Vec::new(),
+            type_map: HashMap::new(),
         }
     }
 }
@@ -186,6 +185,18 @@ impl ECSS {
             self.components.push(Box::new(Collection::<T>::new(size)));
         }
     }
+    pub fn entities_where<T, F>(&self, f: F) -> Vec<Entity>
+    where
+        T: 'static + Component + ComponentType + Sized,
+        F: Fn(&T) -> bool + 'static,
+    {
+        let collection = self.get_collection();
+        collection
+            .iter()
+            .filter(|i| f(i))
+            .map(|i| i.entity_id())
+            .collect()
+    }
 }
 
 #[test]
@@ -240,6 +251,10 @@ fn test() {
         test: 4,
     });
 
+    for i in ecs.entities_where::<Position, _>(move |e| e.test == 3) {
+        assert!(i == entity_3);
+    }
+
     assert!(ecs.exists::<Position>(entity_0));
     assert!(ecs.exists::<Position>(entity_1));
     assert!(ecs.exists::<Position>(entity_2));
@@ -247,9 +262,8 @@ fn test() {
     assert_eq!(ecs.exists::<Position>(entity_4), false);
 
     ecs.remove::<Position>(entity_1);
-    ecs.remove::<Position>(entity_1); // Should just do nothing, but pass
+    ecs.remove::<Position>(entity_1);
 
-    // Free == 1, Slots[1] = 4
     if let Some(pos) = ecs.get::<Position>(entity_3) {
         assert_eq!(pos.test, 3);
     } else {
