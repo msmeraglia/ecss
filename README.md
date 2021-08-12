@@ -1,2 +1,2 @@
 # ecss
-It stands for ECS, Stupid!
+Stupid simple ECS written in Rust.
