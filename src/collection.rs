@@ -32,7 +32,7 @@ impl<T: Component> Collection<T> {
     //TODO: What happens when its full? Return a Result<>, Option<>? Panic?
     //This should definitely indicate to the use its full, perhaps add a flag for if Vecs can resize..
     pub fn create(&mut self, data: T) {
-        let entity = data.get_entity();
+        let entity = data.entity_id();
         if !self.entity_lookup.contains_key(&entity) && self.data.len() < self.data.capacity() {
             self.entity_lookup.insert(entity, self.data.len());
             self.data.push(data);
@@ -80,7 +80,7 @@ impl<T: Component> Collection<T> {
 
             if last_node_id > 0 {
                 // fix up the last node's hashmap value
-                let entity_to_fix = self.data[last_node_id].get_entity();
+                let entity_to_fix = self.data[last_node_id].entity_id();
                 self.entity_lookup.insert(entity_to_fix, swap_id);
                 // swap node to remove with last fixed up node then
                 // remove the last item so that no items need to be shifted
