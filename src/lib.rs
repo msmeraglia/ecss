@@ -1,6 +1,5 @@
-#[macro_use]
 pub mod ecss;
-pub use crate::ecss::{Entity, ECSS};
+pub use crate::ecss::{Entity, ECSS, Type, ComponentType};
 
 mod collection;
 use collection::Collection;

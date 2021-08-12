@@ -8,6 +8,7 @@ pub type Entity = usize; //TODO Make struct including generational id
 pub type Type = u64; //TODO Make struct including generational id
 pub static INVALID_ENTITY: Entity = 0;
 
+#[macro_export]
 macro_rules! component_types {
     ($($t:ident),+) => {
         enum ComponentTypes {
