@@ -1,7 +1,7 @@
 # ecss
 Stupid simple ECS written in Rust.
 
-#Usage
+# Usage
 ```
 #[derive(Debug)]
 struct Transform {
