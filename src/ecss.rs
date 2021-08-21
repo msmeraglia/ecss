@@ -8,7 +8,7 @@ use std::{
 pub type Entity = usize;
 pub type ComponentIdType = u8;
 
-// TODO: 
+// TODO:
 // pub type EntityIdType = usize;
 // #[derive(PartialEq, Eq, PartialOrd, Debug, Clone, Copy, Hash)]
 // pub struct Entity {
