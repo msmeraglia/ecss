@@ -3,9 +3,9 @@ use std::collections::HashMap;
 
 //TODO: Eventually allow client to pass custom allocator for data Vec
 pub struct Collection<T: 'static + Component + Sized> {
-    entity_lookup: HashMap<Entity, usize>,
     data: Vec<T>,
     entities: Vec<Entity>,
+    entity_lookup: HashMap<Entity, usize>,
 }
 
 impl<T: 'static + Component + Sized> Default for Collection<T> {
