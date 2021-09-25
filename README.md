@@ -66,6 +66,6 @@ if let Some(transform) = ecs.get_mut::<Transform>(entity_0) {
 // remove single component type for a given entity
 ecs.remove::<Transform>(entity_0);
 
-// or remove all components of any types
+// or remove all components for a given entity
 ecs.remove_all(entity_0);
 ```
