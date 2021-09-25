@@ -1,14 +1,60 @@
-use crate::{Component, Entity};
-use std::collections::HashMap;
+use super::Entity;
+use std::{any::Any, collections::HashMap};
+
+pub type ComponentIdType = u8;
+
+pub trait Component {
+    fn get_type_id() -> ComponentIdType
+    where
+        Self: Sized;
+}
+
+pub trait EntityCollection: ToAny {
+    fn remove(&mut self, entity: Entity);
+}
+
+pub trait ToAny: 'static {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl<T: 'static> ToAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+impl<T: Component + 'static> EntityCollection for Collection<T> {
+    fn remove(&mut self, entity: Entity) {
+        if self.entity_lookup.contains_key(&entity) && !self.data.is_empty() {
+            let swap_id = *self.entity_lookup.get(&entity).unwrap();
+            let last_node_id = self.data.len() - 1;
+            if last_node_id > 0 {
+                let entity_to_fix = self.entities[last_node_id];
+                self.entity_lookup.insert(entity_to_fix, swap_id);
+                self.data.swap(swap_id, last_node_id);
+                self.entities.swap(swap_id, last_node_id);
+            }
+            self.entity_lookup.remove(&entity);
+            self.data.remove(last_node_id);
+            self.entities.remove(last_node_id);
+        }
+    }
+}
+
+//should store typeid, implement remove_entity
 
 //TODO: Eventually allow client to pass custom allocator for data Vec
-pub struct Collection<T: 'static + Component + Sized> {
+pub struct Collection<T: Component + 'static> {
     data: Vec<T>,
     entities: Vec<Entity>,
     entity_lookup: HashMap<Entity, usize>,
 }
 
-impl<T: 'static + Component + Sized> Default for Collection<T> {
+impl<T: 'static + Component> Default for Collection<T> {
     fn default() -> Self {
         Self {
             data: Vec::new(),
@@ -18,7 +64,7 @@ impl<T: 'static + Component + Sized> Default for Collection<T> {
     }
 }
 
-impl<T: 'static + Component + Sized> Collection<T> {
+impl<T: 'static + Component> Collection<T> {
     pub fn new(size: usize) -> Self {
         Self {
             data: Vec::with_capacity(size),
@@ -100,21 +146,5 @@ impl<T: 'static + Component + Sized> Collection<T> {
             .zip(self.data.iter_mut())
             .map(|(entity, item)| (*entity, item))
             .into_iter()
-    }
-
-    pub fn remove(&mut self, entity: Entity) {
-        if self.entity_lookup.contains_key(&entity) && !self.data.is_empty() {
-            let swap_id = *self.entity_lookup.get(&entity).unwrap();
-            let last_node_id = self.data.len() - 1;
-            if last_node_id > 0 {
-                let entity_to_fix = self.entities[last_node_id];
-                self.entity_lookup.insert(entity_to_fix, swap_id);
-                self.data.swap(swap_id, last_node_id);
-                self.entities.swap(swap_id, last_node_id);
-            }
-            self.entity_lookup.remove(&entity);
-            self.data.remove(last_node_id);
-            self.entities.remove(last_node_id);
-        }
     }
 }

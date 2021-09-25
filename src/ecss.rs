@@ -1,12 +1,11 @@
-use crate::Collection;
+use crate::{Collection, Component, ComponentIdType, EntityCollection};
 use std::{
-    any::{type_name, Any},
+    any::type_name,
     collections::{HashMap, HashSet},
 };
 
 //TODO Make struct including generational id
 pub type Entity = usize;
-pub type ComponentIdType = u8;
 
 // TODO:
 // pub type EntityIdType = usize;
@@ -21,6 +20,10 @@ pub type ComponentIdType = u8;
 //          entity.id as usize
 //     }
 // }
+// #[enum_dispatch]
+// pub enum ComponentType{
+
+// }
 
 #[macro_export]
 macro_rules! component_types {
@@ -34,18 +37,15 @@ macro_rules! component_types {
                 ComponentType::$t as ComponentIdType
             }
         })+
-    };
-}
 
-pub trait Component {
-    fn get_type_id() -> ComponentIdType;
+    };
 }
 
 //Stands for ECS, Stupid.
 pub struct ECSS {
     entity_counter: Entity,
     reusable_entities: Vec<Entity>,
-    type_map: HashMap<ComponentIdType, Box<dyn Any>>,
+    type_map: HashMap<ComponentIdType, Box<dyn EntityCollection>>,
     entity_map: HashMap<Entity, HashSet<ComponentIdType>>,
 }
 
@@ -64,11 +64,11 @@ impl Default for ECSS {
 impl ECSS {
     fn get_collection<T>(&self) -> &Collection<T>
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let type_id = T::get_type_id();
         if let Some(components) = self.type_map.get(&type_id) {
-            return components.downcast_ref::<Collection<T>>().unwrap();
+            return components.as_any().downcast_ref::<Collection<T>>().unwrap();
         }
         panic!(
             "The Type: {} has not been registered with this ECSS instance.",
@@ -78,11 +78,14 @@ impl ECSS {
 
     fn get_collection_mut<T>(&mut self) -> &mut Collection<T>
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let type_id = T::get_type_id();
         if let Some(components) = self.type_map.get_mut(&type_id) {
-            return components.downcast_mut::<Collection<T>>().unwrap();
+            return components
+                .as_any_mut()
+                .downcast_mut::<Collection<T>>()
+                .unwrap();
         }
         panic!(
             "The Type: {} has not been registered with this ECSS instance.",
@@ -93,7 +96,7 @@ impl ECSS {
     /// Returns all entities that have the specified type
     pub fn entities_by_type<T>(&mut self) -> Vec<Entity>
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let collection = self.get_collection::<T>();
         collection.get_entities()
@@ -120,7 +123,7 @@ impl ECSS {
     // TODO: Return Result<> eventually for safer use, although usage will be more verbose...
     pub fn create<T>(&mut self, entity: Entity, data: T)
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let collection = self.get_collection_mut();
         if !collection.contains(entity) {
@@ -134,7 +137,7 @@ impl ECSS {
 
     pub fn entities_where<T, F>(&self, f: F) -> Vec<Entity>
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
         F: Fn(&T) -> bool + 'static,
     {
         let collection = self.get_collection();
@@ -143,7 +146,7 @@ impl ECSS {
 
     pub fn exists<T>(&self, entity: Entity) -> bool
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let collection = self.get_collection::<T>();
         collection.contains(entity)
@@ -151,7 +154,7 @@ impl ECSS {
 
     pub fn get<T>(&self, entity: Entity) -> Option<&T>
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let collection = self.get_collection();
         collection.get(entity)
@@ -159,7 +162,7 @@ impl ECSS {
 
     pub fn get_mut<T>(&mut self, entity: Entity) -> Option<&mut T>
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let collection = self.get_collection_mut();
         collection.get_mut(entity)
@@ -171,7 +174,7 @@ impl ECSS {
 
     pub fn iter<T>(&self) -> impl Iterator<Item = &T>
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let collection = self.get_collection();
         collection.iter()
@@ -179,7 +182,7 @@ impl ECSS {
 
     pub fn iter_mut<T>(&mut self) -> impl Iterator<Item = &mut T>
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let collection = self.get_collection_mut();
         collection.iter_mut()
@@ -187,14 +190,14 @@ impl ECSS {
 
     pub fn iter_with_entities_mut<T>(&mut self) -> impl Iterator<Item = (Entity, &mut T)>
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let collection = self.get_collection_mut();
         collection.iter_with_entities_mut()
     }
     pub fn iter_with_entities<T>(&self) -> impl Iterator<Item = (Entity, &T)>
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let collection = self.get_collection();
         collection.iter_with_entities()
@@ -203,7 +206,7 @@ impl ECSS {
     // Hmmm, Should this be allowed, due to potential for reallocation?
     pub fn register<T>(&mut self)
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let type_id = T::get_type_id();
         if !self.type_map.contains_key(&type_id) {
@@ -213,7 +216,7 @@ impl ECSS {
     }
     pub fn remove<T>(&mut self, entity: Entity)
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let collection = self.get_collection_mut::<T>();
         collection.remove(entity);
@@ -221,9 +224,15 @@ impl ECSS {
         type_list.remove(&T::get_type_id());
     }
 
+    pub fn remove_all(&mut self, entity: Entity) {
+        for components in self.type_map.values_mut() {
+            components.remove(entity);
+        }
+    }
+
     pub fn register_sized<T>(&mut self, size: usize)
     where
-        T: 'static + Component + Sized,
+        T: 'static + Component,
     {
         let type_id = T::get_type_id();
         if !self.type_map.contains_key(&type_id) {
@@ -327,7 +336,10 @@ fn test() {
     };
 
     ecs.remove::<Position>(entity_2);
-    ecs.remove::<Position>(entity_0);
+    ecs.remove_all(entity_0);
+
+    assert!(!ecs.exists::<Position>(entity_0));
+    assert!(!ecs.exists::<AttachedTo>(entity_0));
 
     if let Some(pos) = ecs.get::<Position>(entity_4) {
         assert_eq!(pos.test, 4);
