@@ -63,7 +63,9 @@ if let Some(transform) = ecs.get_mut::<Transform>(entity_0) {
     transform.position[1] = 4.0;
 };
 
-// remove components for a given entity
+// remove single component type for a given entity
 ecs.remove::<Transform>(entity_0);
-ecs.remove::<Collision>(entity_0);
+
+// or remove all components of any types
+ecs.remove_all(entity_0);
 ```
