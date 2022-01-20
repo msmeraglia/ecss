@@ -1,16 +1,16 @@
-use super::Entity;
 use std::{any::Any, collections::HashMap};
 
-pub type ComponentIdType = u8;
+use crate::EntityId;
 
 pub trait Component {
-    fn get_type_id() -> ComponentIdType
+    fn get_type_id() -> u8
     where
         Self: Sized;
+    fn get_entity_id(&self) -> EntityId;
 }
 
 pub trait EntityCollection: ToAny {
-    fn remove(&mut self, entity: Entity);
+    fn remove(&mut self, entity_id: EntityId);
 }
 
 pub trait ToAny: 'static {
@@ -28,9 +28,9 @@ impl<T: 'static> ToAny for T {
 }
 
 impl<T: Component + 'static> EntityCollection for Collection<T> {
-    fn remove(&mut self, entity: Entity) {
-        if self.entity_lookup.contains_key(&entity) && !self.data.is_empty() {
-            let swap_id = *self.entity_lookup.get(&entity).unwrap();
+    fn remove(&mut self, entity_id: EntityId) {
+        if self.entity_lookup.contains_key(&entity_id) && !self.data.is_empty() {
+            let swap_id = *self.entity_lookup.get(&entity_id).unwrap();
             let last_node_id = self.data.len() - 1;
             if last_node_id > 0 {
                 let entity_to_fix = self.entities[last_node_id];
@@ -38,20 +38,16 @@ impl<T: Component + 'static> EntityCollection for Collection<T> {
                 self.data.swap(swap_id, last_node_id);
                 self.entities.swap(swap_id, last_node_id);
             }
-            self.entity_lookup.remove(&entity);
+            self.entity_lookup.remove(&entity_id);
             self.data.remove(last_node_id);
             self.entities.remove(last_node_id);
         }
     }
 }
-
-//should store typeid, implement remove_entity
-
-//TODO: Eventually allow client to pass custom allocator for data Vec
 pub struct Collection<T: Component + 'static> {
     data: Vec<T>,
-    entities: Vec<Entity>,
-    entity_lookup: HashMap<Entity, usize>,
+    entities: Vec<EntityId>,
+    entity_lookup: HashMap<EntityId, usize>,
 }
 
 impl<T: 'static + Component> Default for Collection<T> {
@@ -73,46 +69,45 @@ impl<T: 'static + Component> Collection<T> {
         }
     }
 
-    pub fn contains(&self, entity: Entity) -> bool {
-        self.entity_lookup.contains_key(&entity)
+    pub fn contains(&self, entity_id: EntityId) -> bool {
+        self.entity_lookup.contains_key(&entity_id)
     }
 
-    pub fn create(&mut self, entity: Entity, data: T) {
-        if !self.entity_lookup.contains_key(&entity) && self.data.len() < self.data.capacity() {
-            self.entity_lookup.insert(entity, self.data.len());
+    pub fn create(&mut self, data: T) {
+        let entity_id = data.get_entity_id();
+        if !self.entity_lookup.contains_key(&entity_id) && self.data.len() < self.data.capacity() {
+            self.entity_lookup.insert(entity_id, self.data.len());
+            self.entities.push(entity_id);
             self.data.push(data);
-            self.entities.push(entity);
         }
     }
 
-    pub fn entities_where<F>(&self, f: F) -> Vec<Entity>
+    pub fn entities_where<F>(&self, f: F) -> Vec<EntityId>
     where
         F: Fn(&T) -> bool + 'static,
     {
-        let mut entities = Vec::new();
-        for (i, item) in self.data.iter().enumerate() {
-            if f(item) {
-                entities.push(self.entities[i]);
-            }
-        }
-        entities
+        self.data
+        .iter()
+        .filter(|&data| f(data))
+        .map(|data|data.get_entity_id())
+        .collect()
     }
 
-    pub fn get(&self, entity: Entity) -> Option<&T> {
-        if let Some(data_id) = self.entity_lookup.get(&entity) {
+    pub fn get(&self, entity_id: EntityId) -> Option<&T> {
+        if let Some(data_id) = self.entity_lookup.get(&entity_id) {
             return self.data.get(*data_id);
         }
         None
     }
 
-    pub fn get_mut(&mut self, entity: Entity) -> Option<&mut T> {
-        if let Some(data_id) = self.entity_lookup.get(&entity) {
+    pub fn get_mut(&mut self, entity_id: EntityId) -> Option<&mut T> {
+        if let Some(data_id) = self.entity_lookup.get(&entity_id) {
             return self.data.get_mut(*data_id);
         }
         None
     }
 
-    pub fn get_entities(&self) -> Vec<Entity> {
+    pub fn get_entities(&self) -> Vec<EntityId> {
         self.entities.clone()
     }
 
@@ -132,7 +127,7 @@ impl<T: 'static + Component> Collection<T> {
         self.data.iter_mut()
     }
 
-    pub fn iter_with_entities(&self) -> impl Iterator<Item = (Entity, &T)> {
+    pub fn iter_with_entities(&self) -> impl Iterator<Item = (EntityId, &T)> {
         self.entities
             .iter()
             .zip(self.data.iter())
@@ -140,7 +135,7 @@ impl<T: 'static + Component> Collection<T> {
             .into_iter()
     }
 
-    pub fn iter_with_entities_mut(&mut self) -> impl Iterator<Item = (Entity, &mut T)> {
+    pub fn iter_with_entities_mut(&mut self) -> impl Iterator<Item = (EntityId, &mut T)> {
         self.entities
             .iter()
             .zip(self.data.iter_mut())

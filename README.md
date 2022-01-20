@@ -1,5 +1,5 @@
 # ecss
-Stupid simple ECS written in Rust.
+Stupid-simple ECS written in Rust.
 
 # Usage
 ```
